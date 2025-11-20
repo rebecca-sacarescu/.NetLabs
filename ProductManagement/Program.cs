@@ -1,41 +1,87 @@
+using Microsoft.EntityFrameworkCore;
+
+
+using AutoMapper;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.OpenApi;
+using ProductManagement.Persistence;
+using ProductManagement.Middleware;
+using ProductManagement.Mappings;
+using ProductManagement.Features.Products;
+using ProductManagement.Validators;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+
+// Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Product Management API",
+        Version = "v1",
+        Description = "API for managing products."
+    });
+});
+
+// PostgreSQL
+builder.Services.AddDbContext<ProductManagementContext>(options =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+});
+
+// Caching
+builder.Services.AddMemoryCache();
+
+// AutoMapper
+builder.Services.AddAutoMapper(typeof(AdvancedProductMappingProfile));
+
+// FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<CreateProductProfileValidator>();
+builder.Services.AddFluentValidationAutoValidation();
+
+// Handlers
+builder.Services.AddScoped<CreateProductProfileHandler>();
+
+// CORS (optional)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DevCors", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Ensure DB
+using (var scope = app.Services.CreateScope())
 {
-    app.MapOpenApi();
+    var context = scope.ServiceProvider.GetRequiredService<ProductManagementContext>();
+    context.Database.Migrate();
 }
 
+// Middleware
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseCorrelationIdMiddleware();
+app.UseGlobalExceptionMiddleware();
+app.UseCors("DevCors");
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-    {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast");
+// ENDPOINT — Product Creation
+app.MapPost("/products", async (CreateProductProfileRequest req, CreateProductProfileHandler handler) =>
+    await handler.Handle(req));
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+public partial class Program { }

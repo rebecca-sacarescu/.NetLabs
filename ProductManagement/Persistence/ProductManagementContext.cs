@@ -2,7 +2,12 @@
 
 namespace ProductManagement.Persistence;
 
-public class ProductManagementContext(DbContextOptions<ProductManagementContext> options) : DbContext(options)
+public class ProductManagementContext : DbContext
 {
-    public DbSet<Product> Product { get; set; }
+    public ProductManagementContext(DbContextOptions<ProductManagementContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<Product> Product { get; set; } = null!;
 }

@@ -1,4 +1,6 @@
-﻿namespace ProductManagement;
+﻿using ProductManagement;
+
+namespace ProductManagement.Features.Products;
 
 public record CreateProductProfileRequest(
     string Name,
