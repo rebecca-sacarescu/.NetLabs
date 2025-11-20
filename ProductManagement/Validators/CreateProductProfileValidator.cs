@@ -2,6 +2,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using ProductManagement;
 using ProductManagement.Features.Products;
 using ProductManagement.Persistence;
 
@@ -11,22 +12,23 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
 {
     private readonly ProductManagementContext _context;
     private readonly ILogger<CreateProductProfileValidator> _logger;
-
+    
     private static readonly string[] InappropriateWords =
-    [
-        "ai-generated", "fake", "scam", "fraud", "illegal", "banned",
-    ];
-
+    {
+        "fake", "aigenerated", "offensive"
+    };
+    
     private static readonly string[] HomeRestrictedWords =
-    [
-        "weapon", "explosive", "toxic"
-    ];
+    {
+        "weapon", "explosive", "toxic", "chemical"
+    };
 
     private static readonly string[] TechnologyKeywords =
-    [
-        "tv", "smart", "laptop", "phone", "tablet", "camera",
-        "headphones", "speaker", "console", "monitor", "pc"
-    ];
+    {
+        "smart", "tv", "laptop", "phone", "tablet", "pc", "console",
+        "camera", "headphones", "speaker", "monitor", "usb", "bluetooth",
+        "wifi", "router", "gaming"
+    };
 
     public CreateProductProfileValidator(
         ProductManagementContext context,
@@ -35,7 +37,6 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
         _context = context;
         _logger = logger;
 
-        // Name
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Product name is required.")
             .MinimumLength(1).MaximumLength(200)
@@ -45,7 +46,6 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
             .MustAsync(BeUniqueName)
             .WithMessage("A product with the same name already exists for this brand.");
 
-        // Brand
         RuleFor(x => x.Brand)
             .NotEmpty().WithMessage("Brand is required.")
             .MinimumLength(2).MaximumLength(100)
@@ -53,7 +53,6 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
             .Must(BeValidBrandName)
             .WithMessage("Brand contains invalid characters.");
 
-        // SKU
         RuleFor(x => x.SKU)
             .NotEmpty().WithMessage("SKU is required.")
             .Must(BeValidSKU)
@@ -61,40 +60,34 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
             .MustAsync(BeUniqueSKU)
             .WithMessage("SKU must be unique.");
 
-        // Category
         RuleFor(x => x.Category)
             .IsInEnum()
             .WithMessage("Category must be a valid value.");
 
-        // Price
         RuleFor(x => x.Price)
             .GreaterThan(0).WithMessage("Price must be greater than 0.")
             .LessThan(10_000).WithMessage("Price must be less than 10,000.");
 
-        // Release date
         RuleFor(x => x.ReleaseDate)
             .Must(d => d >= new DateTime(1900, 1, 1))
             .WithMessage("Release date cannot be before year 1900.")
-            .Must(d => d <= DateTime.UtcNow.Date)
+            .Must(d => d <= DateTime.UtcNow)
             .WithMessage("Release date cannot be in the future.");
 
-        // Stock
         RuleFor(x => x.StockQuantity)
             .GreaterThanOrEqualTo(0).WithMessage("Stock quantity cannot be negative.")
             .LessThanOrEqualTo(100_000).WithMessage("Stock quantity cannot exceed 100,000.");
 
-        // Image URL
         When(x => !string.IsNullOrWhiteSpace(x.ImageUrl), () =>
         {
             RuleFor(x => x.ImageUrl!)
                 .Must(BeValidImageUrl)
-                .WithMessage("ImageUrl must be a valid HTTP/HTTPS image URL.");
+                .WithMessage("ImageUrl must be a valid HTTP/HTTPS image URL ending with .jpg, .jpeg, .png, .gif or .webp.");
         });
-        
+
         RuleFor(x => x)
             .MustAsync(PassBusinessRules)
             .WithMessage("Product does not satisfy business rules.");
-
 
         When(x => x.Category == ProductCategory.Electronics, () =>
         {
@@ -111,7 +104,7 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
                 .WithMessage("Electronics products must be released within the last 5 years.");
         });
 
-        // Home
+
         When(x => x.Category == ProductCategory.Home, () =>
         {
             RuleFor(x => x.Price)
@@ -120,28 +113,23 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
 
             RuleFor(x => x.Name)
                 .Must(BeAppropriateForHome)
-                .WithMessage("Home product name contains inappropriate content.");
+                .WithMessage("Home product name contains inappropriate words.");
         });
-        
+
         When(x => x.Category == ProductCategory.Clothing, () =>
         {
             RuleFor(x => x.Brand)
                 .MinimumLength(3)
                 .WithMessage("Clothing brand name must be at least 3 characters.");
         });
-        
+
         RuleFor(x => x.StockQuantity)
             .Must((request, stock) => request.Price <= 100m || stock <= 20)
             .WithMessage("Expensive products (price > 100) must have stock quantity ≤ 20 units.");
-        
-        When(x => x.Category == ProductCategory.Electronics, () =>
-        {
-            RuleFor(x => x.ReleaseDate)
-                .Must(d => d >= DateTime.UtcNow.AddYears(-5))
-                .WithMessage("Electronics must be released within the last 5 years.");
-        });
+
+  
     }
-    
+
 
     private bool BeValidName(string name)
     {
@@ -161,9 +149,8 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
 
     private async Task<bool> BeUniqueName(CreateProductProfileRequest request, string name, CancellationToken cancellationToken)
     {
-        var exists = await _context.Product.AnyAsync(
-            p => p.Name == name && p.Brand == request.Brand,
-            cancellationToken);
+        var exists = await _context.Product
+            .AnyAsync(p => p.Name == name && p.Brand == request.Brand, cancellationToken);
 
         if (exists)
         {
@@ -223,29 +210,31 @@ public class CreateProductProfileValidator : AbstractValidator<CreateProductProf
             return false;
 
         var lower = uri.AbsolutePath.ToLowerInvariant();
-        return lower.EndsWith(".jpg") || lower.EndsWith(".jpeg") || lower.EndsWith(".png")
-               || lower.EndsWith(".gif") || lower.EndsWith(".webp");
+        return lower.EndsWith(".jpg")
+               || lower.EndsWith(".jpeg")
+               || lower.EndsWith(".png")
+               || lower.EndsWith(".gif")
+               || lower.EndsWith(".webp");
     }
 
     private async Task<bool> PassBusinessRules(CreateProductProfileRequest request, CancellationToken cancellationToken)
     {
         var today = DateTime.UtcNow.Date;
-        var todayCount = await _context.Product.CountAsync(
-            p => p.CreatedAt.Date == today,
-            cancellationToken);
+        var todayCount = await _context.Product
+            .CountAsync(p => p.CreatedAt.Date == today, cancellationToken);
 
         if (todayCount >= 500)
         {
             _logger.LogWarning("Daily product addition limit reached for date {Date}", today);
             return false;
         }
-        
-        if (request.Category == ProductCategory.Electronics && request.Price < 50.0m)
+
+        if (request.Category == ProductCategory.Electronics && request.Price < 50m)
         {
             _logger.LogWarning("Electronics minimum price rule failed. SKU {SKU}, Price {Price}", request.SKU, request.Price);
             return false;
         }
-        
+
         if (request.Category == ProductCategory.Home && !BeAppropriateForHome(request.Name))
         {
             _logger.LogWarning("Home product content rule failed for Name {Name}", request.Name);

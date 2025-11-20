@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 
 namespace ProductManagement.Validators.Attributes;
 
@@ -28,6 +29,8 @@ public class PriceRangeAttribute : ValidationAttribute
 
     public override string FormatErrorMessage(string name)
     {
-        return $"The {name} field must be between {_min:C2} and {_max:C2}.";
+        var minStr = _min.ToString("C2", CultureInfo.InvariantCulture);
+        var maxStr = _max.ToString("C2", CultureInfo.InvariantCulture);
+        return $"The {name} field must be between {minStr} and {maxStr}.";
     }
 }

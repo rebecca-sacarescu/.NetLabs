@@ -1,15 +1,16 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using ProductManagement;
 
 namespace ProductManagement.Validators.Attributes;
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
 public class ProductCategoryAttribute : ValidationAttribute
 {
-    private readonly ProductCategory[] _allowedCategories;
+    private readonly ProductCategory[] _allowed;
 
-    public ProductCategoryAttribute(params ProductCategory[] allowedCategories)
+    public ProductCategoryAttribute(params ProductCategory[] allowed)
     {
-        _allowedCategories = allowedCategories;
+        _allowed = allowed;
     }
 
     public override bool IsValid(object? value)
@@ -18,7 +19,7 @@ public class ProductCategoryAttribute : ValidationAttribute
 
         if (value is ProductCategory category)
         {
-            return _allowedCategories.Contains(category);
+            return _allowed.Contains(category);
         }
 
         return false;
@@ -26,7 +27,7 @@ public class ProductCategoryAttribute : ValidationAttribute
 
     public override string FormatErrorMessage(string name)
     {
-        var allowed = string.Join(", ", _allowedCategories.Select(c => c.ToString()));
-        return $"The {name} field must be one of the following categories: {allowed}.";
+        var allowedList = string.Join(", ", _allowed.Select(a => a.ToString()));
+        return $"The {name} field must be one of the following categories: {allowedList}.";
     }
 }

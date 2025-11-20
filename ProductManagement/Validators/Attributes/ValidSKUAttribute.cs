@@ -13,12 +13,13 @@ public class ValidSKUAttribute : ValidationAttribute, IClientModelValidator
 
     public override bool IsValid(object? value)
     {
-        if (value is null) return true;
+        if (value is null)
+            return true; 
 
         var sku = value.ToString()!.Replace(" ", string.Empty);
 
         if (string.IsNullOrWhiteSpace(sku))
-            return true; 
+            return true;
 
         if (sku.Length < 5 || sku.Length > 20)
             return false;
@@ -35,9 +36,7 @@ public class ValidSKUAttribute : ValidationAttribute, IClientModelValidator
     private static bool MergeAttribute(IDictionary<string, string> attributes, string key, string value)
     {
         if (attributes.ContainsKey(key))
-        {
             return false;
-        }
 
         attributes.Add(key, value);
         return true;
