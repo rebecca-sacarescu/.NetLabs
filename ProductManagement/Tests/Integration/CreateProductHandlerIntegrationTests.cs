@@ -74,7 +74,7 @@ public class CreateProductHandlerIntegrationTests : IDisposable
         created.BrandInitials.Should().Be("TB");
         created.FormattedPrice.Should().StartWith("$");
         created.IsAvailable.Should().BeTrue();
-        created.AvailabilityStatus.Should().Be("In Stock");
+        created.AvailabilityStatus.Should().Be("Limited Stock");
         created.ProductAge.Should().Contain("months");
 
         _mockLogger.VerifyLogWithEventId(LogLevel.Information, 2001);
