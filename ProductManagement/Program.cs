@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using ProductManagement.Persistence;
@@ -10,17 +9,8 @@ using ProductManagement.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Swagger
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Product Management API",
-        Version = "v1",
-        Description = "API for managing products."
-    });
-});
+builder.Services.AddSwaggerGen(); 
 
 builder.Services.AddDbContext<ProductManagementContext>(options =>
 {
@@ -28,17 +18,18 @@ builder.Services.AddDbContext<ProductManagementContext>(options =>
 });
 
 builder.Services.AddMemoryCache();
-builder.Services.AddAutoMapper(typeof(AdvancedProductMappingProfile));
+builder.Services.AddAutoMapper(typeof(ProductMappingProfile), typeof(AdvancedProductMappingProfile));
 builder.Services.AddScoped<IValidator<CreateProductProfileRequest>, CreateProductProfileValidator>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateProductProfileValidator>();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddScoped<CreateProductProfileHandler>();
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
     {
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
@@ -64,12 +55,7 @@ app.UseHttpsRedirection();
 
 app.MapPost("/products", async (CreateProductProfileRequest req, CreateProductProfileHandler handler) =>
     await handler.Handle(req))
-    .WithName("CreateProduct")
-    .WithOpenApi(op =>
-    {
-        op.Description = "Creates a new product with full validation, mapping and logging.";
-        return op;
-    });
+    .WithName("CreateProduct");
 
 app.Run();
 
